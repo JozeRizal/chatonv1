@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHAT ON - Asisten AI Berbasis PDF</title>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- PDF.js from Mozilla for reading PDF files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+
+    <!-- Markdown to HTML converter -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <style>
+        /* Custom scrollbar for a cleaner look */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        /* Spinner animation for loading indicator */
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner {
+            border: 3px solid rgba(0,0,0,0.1);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            width: 1.5rem;
+            height: 1.5rem;
+            animation: spin 1s linear infinite;
+        }
+        .ai-thinking-dot { animation: bounce 1.4s infinite ease-in-out both; }
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1.0); }
+        }
+        .ai-thinking-dot:nth-child(1) { animation-delay: -0.32s; }
+        .ai-thinking-dot:nth-child(2) { animation-delay: -0.16s; }
+        
+        /* Styling for AI response paragraphs */
+        .ai-message-content p {
+            margin-bottom: 0.75rem; /* 12px */
+        }
+        .ai-message-content p:last-child {
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 flex items-center justify-center min-h-screen font-sans">
+
+    <div class="w-full max-w-2xl mx-auto p-4">
+        <!-- Main container -->
+        <div id="app-container" class="bg-white rounded-2xl shadow-2xl overflow-hidden transition-all duration-500">
+
+            <!-- ====================================================== -->
+            <!-- 1. SETUP VIEW (For Website Owner)                      -->
+            <!-- ====================================================== -->
+            <div id="setup-view" class="p-8">
+                <div class="text-center">
+                    <h1 class="text-3xl font-bold text-slate-800">CHAT ON</h1>
+                    <p class="text-slate-500 mt-2">Asisten AI Cerdas untuk Website Anda</p>
+                </div>
+
+                <!-- Step 1: API Key Input -->
+                <div class="mt-8">
+                     <label for="api-key-input" class="block text-sm font-medium text-slate-700 text-left mb-1">Langkah 1: Masukkan Kunci API</label>
+                     <input type="password" id="api-key-input" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Tempelkan Kunci API Google AI Anda di sini">
+                     <p class="text-xs text-slate-500 mt-1 text-left">
+                         Belum punya kunci? Dapatkan secara gratis di 
+                         <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-blue-600 hover:underline">Google AI Studio</a>.
+                     </p>
+                </div>
+
+                <!-- Step 2: PDF Upload -->
+                <div class="mt-6 border-2 border-dashed border-slate-300 rounded-lg p-8 text-center bg-slate-50">
+                    <svg class="mx-auto h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <h2 class="mt-4 text-xl font-semibold text-slate-700">Langkah 2: Unggah PDF</h2>
+                    <p class="mt-1 text-sm text-slate-500">Pilih file PDF yang akan menjadi basis pengetahuan AI.</p>
+                    
+                    <div class="mt-6">
+                        <input type="file" id="pdf-upload" class="hidden" accept=".pdf" />
+                        <label for="pdf-upload" id="pdf-upload-button" class="bg-blue-600 text-white font-semibold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 cursor-pointer inline-block">
+                            Pilih File PDF
+                        </label>
+                    </div>
+                </div>
+
+                <div id="upload-status" class="mt-4 text-center text-sm min-h-[20px]"></div>
+            </div>
+
+            <!-- ====================================================== -->
+            <!-- 2. EMBED VIEW (After Upload)                 -->
+            <!-- ====================================================== -->
+            <div id="embed-view" class="hidden p-8 text-center">
+                 <svg class="mx-auto h-12 w-12 text-green-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                 <h2 class="mt-4 text-xl font-semibold text-slate-700">Berhasil! Widget Siap Digunakan</h2>
+                 <p class="mt-1 text-sm text-slate-500">Salin kode di bawah ini dan tempelkan ke dalam editor HTML di website Anda.</p>
+                
+                 <div class="mt-6 text-left">
+                     <label for="embed-code" class="block text-sm font-medium text-slate-700 mb-1">Kode Widget Pop-up</label>
+                     <textarea id="embed-code" readonly class="w-full h-40 p-3 font-mono text-xs bg-slate-100 text-slate-800 border border-slate-300 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                 </div>
+                 <div class="mt-4">
+                     <button id="copy-button" class="bg-slate-600 text-white font-semibold py-2 px-6 rounded-lg hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2">
+                         Salin Kode
+                     </button>
+                 </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const setupView = document.getElementById('setup-view');
+        const embedView = document.getElementById('embed-view');
+        const apiKeyInput = document.getElementById('api-key-input');
+        const pdfUploadInput = document.getElementById('pdf-upload');
+        const uploadStatus = document.getElementById('upload-status');
+        const embedCodeTextarea = document.getElementById('embed-code');
+        const copyButton = document.getElementById('copy-button');
+        
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js`;
+
+        pdfUploadInput.addEventListener('change', handlePdfUpload);
+        copyButton.addEventListener('click', copyEmbedCode);
+
+        async function handlePdfUpload(event) {
+            const apiKey = apiKeyInput.value.trim();
+            if (!apiKey) {
+                updateStatus('Error: Mohon masukkan Kunci API Anda terlebih dahulu.', 'error');
+                return;
+            }
+
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (file.type !== 'application/pdf') {
+                updateStatus('Error: Format file harus PDF.', 'error');
+                return;
+            }
+
+            updateStatus('Membaca file...', 'loading');
+
+            try {
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const typedarray = new Uint8Array(e.target.result);
+                        const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                        
+                        let fullText = '';
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            updateStatus(`Mengekstrak teks halaman ${i}/${pdf.numPages}...`, 'loading');
+                            const page = await pdf.getPage(i);
+                            const textContent = await page.getTextContent();
+                            const pageText = textContent.items.map(item => item.str).join(' ');
+                            fullText += pageText.replace(/\s+/g, ' ') + ' ';
+                        }
+                        
+                        onPdfProcessed(fullText.trim(), apiKey);
+
+                    } catch (pdfError) {
+                         console.error('Error saat memproses PDF:', pdfError);
+                         updateStatus('Gagal memproses file PDF. Mungkin file rusak.', 'error');
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            } catch (error) {
+                console.error('Error membaca file:', error);
+                updateStatus('Gagal membaca file. Silakan coba lagi.', 'error');
+            }
+        }
+
+        function onPdfProcessed(pdfText, apiKey) {
+            updateStatus('Membuat kode widget...', 'loading');
+            
+            const encodedPdfData = btoa(encodeURIComponent(pdfText));
+
+            const iframeHtml = `
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHAT ON</title>
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar{width:6px;}.custom-scrollbar::-webkit-scrollbar-track{background:#f1f5f9;}.custom-scrollbar::-webkit-scrollbar-thumb{background:#94a3b8;border-radius:3px;}.ai-thinking-dot{animation:bounce 1.4s infinite ease-in-out both;}@keyframes bounce{0%,80%,100%{transform:scale(0)}40%{transform:scale(1.0)}}.ai-thinking-dot:nth-child(1){animation-delay:-.32s;}.ai-thinking-dot:nth-child(2){animation-delay:-.16s;}
+        .ai-message-content p { margin-bottom: 0.75rem; }
+        .ai-message-content p:last-child { margin-bottom: 0; }
+    <\/style>
+<\/head>
+<body class="font-sans text-sm">
+    <div id="pdf-data" style="display:none;">${encodedPdfData}<\/div>
+    <div id="api-key-data" style="display:none;">${apiKey}<\/div>
+    <div class="h-screen w-screen flex flex-col bg-white">
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 p-4 flex items-center justify-between text-white shadow-md flex-shrink-0">
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
+                <div><h2 class="font-bold text-lg">CHAT ON</h2><p class="text-xs opacity-80">Asisten Virtual</p></div>
+            </div>
+            <button id="close-chat-btn" class="sm:hidden p-1 text-white rounded-full hover:bg-white/20">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+        <div id="chat-messages" class="flex-grow p-4 overflow-y-auto custom-scrollbar bg-slate-50">
+            <div class="flex items-start gap-3 mb-4">
+                <div class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold flex-shrink-0 text-sm">AI</div>
+                <div class="bg-white p-3 rounded-lg rounded-tl-none shadow-sm max-w-xs md:max-w-md"><p class="text-slate-700">Halo! Saya asisten AI. Silakan ajukan pertanyaan.</p></div>
+            </div>
+        </div>
+        <div class="p-4 border-t border-slate-200 bg-white flex-shrink-0">
+            <form id="chat-form" class="flex items-center gap-3">
+                <input type="text" id="chat-input" placeholder="Ketik pertanyaan Anda..." autocomplete="off" class="w-full px-4 py-2 border border-slate-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button type="submit" class="bg-blue-600 text-white rounded-full p-3 hover:bg-blue-700 disabled:bg-slate-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"><\/line><polygon points="22 2 15 22 11 13 2 9 22 2"><\/polygon><\/svg></button>
+            </form>
+        </div>
+    </div>
+    <script>
+        const pdfTextContent = decodeURIComponent(atob(document.getElementById('pdf-data').textContent));
+        const apiKey = document.getElementById('api-key-data').textContent;
+        let chatHistory = [];
+        const chatMessages = document.getElementById('chat-messages');
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+        const sendButton = chatForm.querySelector('button');
+        const closeButton = document.getElementById('close-chat-btn');
+        const systemInstruction = {
+            parts: [{ text: "Anda adalah 'CHAT ON', asisten AI yang ramah dan membantu. Tugas utama Anda adalah menjawab pertanyaan pengguna HANYA berdasarkan konteks yang diberikan (" + pdfTextContent + "). Jangan pernah memberikan informasi di luar konteks ini. Jika jawaban tidak ada dalam konteks, katakan dengan sopan bahwa Anda tidak dapat menemukan informasi tersebut. Jawaban harus dalam bahasa Indonesia. PENTING: Jangan gunakan format Markdown seperti tanda bintang (*) untuk membuat daftar atau bold. Jawablah dalam bentuk paragraf yang rapi dan mudah dibaca." }]
+        };
+
+        closeButton.addEventListener('click', () => {
+             window.parent.postMessage('close-chat-on-widget', '*');
+        });
+
+        chatForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const userMessage = chatInput.value.trim();
+            if (!userMessage || !apiKey) return;
+            
+            addMessageToUI("user", userMessage);
+            chatHistory.push({ role: "user", parts: [{ text: userMessage }] });
+            chatInput.value = "";
+            sendButton.disabled = true;
+            const thinkingIndicator = showThinkingIndicator();
+            
+            try {
+                const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=" + apiKey, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ contents: chatHistory, systemInstruction: systemInstruction })
+                });
+                if (!response.ok) {
+                    const errorBody = await response.json();
+                    throw new Error("API request failed: " + (errorBody.error?.message || response.statusText));
+                }
+                const result = await response.json();
+                const aiMessage = result.candidates[0].content.parts[0].text;
+                chatHistory.push({ role: "model", parts: [{ text: aiMessage }] });
+                addMessageToUI("ai", aiMessage);
+            } catch (error) {
+                console.error("Error calling Gemini API:", error);
+                addMessageToUI("ai", "Maaf, terjadi kesalahan. Pastikan Kunci API Anda valid dan coba lagi.");
+            } finally {
+                removeThinkingIndicator(thinkingIndicator);
+                sendButton.disabled = false;
+            }
+        });
+
+        function addMessageToUI(sender, message) {
+            const element = document.createElement("div");
+            element.className = "flex items-start gap-3 mb-4";
+            if (sender === "user") {
+                element.classList.add("justify-end");
+                const sanitizedMsg = message.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                element.innerHTML = \`<div class="bg-blue-600 text-white p-3 rounded-lg rounded-br-none shadow-sm max-w-xs md:max-w-md"><p>\${sanitizedMsg}<\/p><\/div><div class="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-bold flex-shrink-0">Anda<\/div>\`;
+            } else {
+                const htmlMessage = marked.parse(message);
+                element.innerHTML = \`<div class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold flex-shrink-0">AI<\/div><div class="bg-white p-3 rounded-lg rounded-tl-none shadow-sm max-w-xs md:max-w-md ai-message-content"><div class="text-slate-700">\${htmlMessage}<\/div><\/div>\`;
+            }
+            chatMessages.appendChild(element);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        function showThinkingIndicator() {
+            const indicator = document.createElement("div");
+            indicator.className = "flex items-start gap-3 mb-4";
+            indicator.innerHTML = \`<div class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold flex-shrink-0">AI<\/div><div class="bg-white p-3 rounded-lg rounded-tl-none shadow-sm flex items-center space-x-1"><div class="w-2 h-2 bg-slate-400 rounded-full ai-thinking-dot"><\/div><div class="w-2 h-2 bg-slate-400 rounded-full ai-thinking-dot"><\/div><div class="w-2 h-2 bg-slate-400 rounded-full ai-thinking-dot"><\/div><\/div>\`;
+            chatMessages.appendChild(indicator);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            return indicator;
+        }
+        function removeThinkingIndicator(indicator) { if(indicator) {indicator.remove();} }
+    <\/script>
+<\/body>
+<\/html>
+`;
+
+            const finalBase64Html = btoa(iframeHtml);
+
+            const embedScript = `<!-- Kode Widget CHAT ON -->
+<div id="chat-on-container"></div>
+<script>
+(function() {
+    const b64content = "${finalBase64Html}";
+    const container = document.getElementById('chat-on-container');
+    if (!container) { return; }
+
+    const styles = \`
+        #chat-on-bubble { position: fixed; bottom: 25px; right: 25px; height: 50px; background-color: #2563eb; border-radius: 25px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.2); transition: all 0.2s ease-in-out; z-index: 9998; padding: 0 20px 0 15px; gap: 8px; color: white; font-family: sans-serif; font-weight: 600; font-size: 16px; }
+        #chat-on-bubble:hover { transform: scale(1.05); }
+        #chat-on-bubble svg { color: white; width: 24px; height: 24px; flex-shrink: 0; }
+        #chat-on-bubble.close-mode { width: 60px; height: 60px; padding: 0; border-radius: 50%; gap: 0; }
+        #chat-on-window { position: fixed; bottom: 100px; right: 25px; width: 400px; max-width: calc(100% - 40px); height: 600px; max-height: calc(100% - 120px); border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); overflow: hidden; opacity: 0; transform: translateY(20px); transition: opacity 0.3s ease, transform 0.3s ease; pointer-events: none; z-index: 9999; }
+        #chat-on-window.active { opacity: 1; transform: translateY(0); pointer-events: auto; }
+        @media (max-width: 640px) { #chat-on-window { width: 100%; height: 100%; max-height: 100%; top: 0; right: 0; bottom: 0; left: 0; border-radius: 0; } #chat-on-bubble { bottom: 15px; right: 15px; } }
+    \`;
+
+    const chatIcon = \`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"><\\/path><\\/svg><span>Tanya CS</span>\`;
+    const closeIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"><\\/line><line x1="6" y1="6" x2="18" y2="18"><\\/line><\\/svg>';
+
+    container.innerHTML = \`<div id="chat-on-bubble">\${chatIcon}</div><div id="chat-on-window"><iframe style="border:none; width:100%; height:100%;" title="CHAT ON Assistant"><\\/iframe></div>\`;
+
+    const iframe = container.querySelector('iframe');
+    try { iframe.srcdoc = atob(b64content); } catch (e) { console.error("Gagal memuat widget.", e); }
+
+    const styleSheet = document.createElement("style");
+    styleSheet.innerText = styles;
+    document.head.appendChild(styleSheet);
+
+    const bubble = document.getElementById('chat-on-bubble');
+    const chatWindow = document.getElementById('chat-on-window');
+    
+    bubble.addEventListener('click', () => {
+        const isActive = chatWindow.classList.toggle('active');
+        if (isActive) {
+            bubble.classList.add('close-mode');
+            bubble.innerHTML = closeIcon;
+        } else {
+            bubble.classList.remove('close-mode');
+            bubble.innerHTML = chatIcon;
+        }
+    });
+
+    window.addEventListener('message', function(event) {
+        if (event.data === 'close-chat-on-widget') {
+            chatWindow.classList.remove('active');
+            bubble.classList.remove('close-mode');
+            bubble.innerHTML = chatIcon;
+        }
+    });
+})();
+<`+`/script>`;
+            
+            embedCodeTextarea.value = embedScript;
+            setupView.classList.add('hidden');
+            embedView.classList.remove('hidden');
+            updateStatus('Selesai! Widget Anda siap digunakan.', 'success');
+        }
+
+        function copyEmbedCode() {
+            embedCodeTextarea.select();
+            document.execCommand('copy');
+            copyButton.textContent = 'Berhasil Disalin!';
+            setTimeout(() => { copyButton.textContent = 'Salin Kode'; }, 2000);
+        }
+
+        function updateStatus(message, type = 'info') {
+            const statusEl = uploadStatus;
+            statusEl.innerHTML = ''; // Clear previous content
+            if (type === 'loading') {
+                const spinner = document.createElement('div');
+                spinner.className = 'spinner mx-auto';
+                statusEl.appendChild(spinner);
+            }
+            const textEl = document.createElement('p');
+            textEl.textContent = message;
+            textEl.className = 'mt-2';
+            statusEl.appendChild(textEl);
+            
+            statusEl.classList.remove('text-red-500', 'text-green-500', 'text-blue-500');
+            if (type === 'error') statusEl.classList.add('text-red-500');
+            else if (type === 'success') statusEl.classList.add('text-green-500');
+            else statusEl.classList.add('text-blue-500');
+        }
+    });
+    </script>
+</body>
+</html>
+
